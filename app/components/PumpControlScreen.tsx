@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, FlatList } from 'react-native';
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, FlatList, Switch } from 'react-native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation
+import { useNavigation } from '@react-navigation/native';
 
 interface Motor {
   _id: string;
@@ -24,7 +24,7 @@ const PumpControlScreen = () => {
   const [selectedTime, setSelectedTime] = useState<Date>(new Date());
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [isTimePickerVisible, setTimePickerVisibility] = useState(false);
-  const navigation = useNavigation(); // Initialize useNavigation
+  const navigation = useNavigation();
 
   const fetchMotors = async () => {
     try {
@@ -38,7 +38,15 @@ const PumpControlScreen = () => {
       console.error('Error fetching motors:', error);
     }
   };
-
+  const handleDeleteMotor = async (motorId: string) => {
+    try {
+      await axios.delete(`http://192.168.1.35:5000/api/motors/delete/${motorId}`);
+      fetchMotors(); // Refresh the list after deletion
+    } catch (error) {
+      console.error('Error deleting motor:', error);
+    }
+  };
+  
   const handleAddMotor = async () => {
     try {
       await axios.post('http://192.168.1.35:5000/api/motors/create', { name: newMotorName, ref: motorRef });
@@ -65,13 +73,8 @@ const PumpControlScreen = () => {
 
   const handleScheduleSubmit = async () => {
     if (selectedMotor) {
-      console.log('Selected Motor ID:', selectedMotor._id);
-      console.log('Selected Date:', selectedDate);
-  
       const formattedTime = selectedTime.toISOString().split('T')[1].split('.')[0];
   
-      console.log('Selected Time:', formattedTime);
-      
       try {
         await axios.post('http://192.168.1.35:5000/api/motors/schedule', {
           motorId: selectedMotor._id,
@@ -109,6 +112,11 @@ const PumpControlScreen = () => {
     navigation.navigate('Login');
   };
 
+  const handleSwitchToggle = async (motorId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'on' ? 'off' : 'on';
+    await toggleMotor(motorId, newStatus);
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.addButton} onPress={() => setAddModalVisible(true)}>
@@ -124,54 +132,58 @@ const PumpControlScreen = () => {
             <Text style={styles.motorRef}>{item.ref}</Text>
             <Text style={styles.motorStatus}>Status: {item.status}</Text>
             <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={() => toggleMotor(item._id, 'on')} style={styles.onButton}>
-                <Text style={styles.buttonText}>On</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => toggleMotor(item._id, 'off')} style={styles.offButton}>
-                <Text style={styles.buttonText}>Off</Text>
-              </TouchableOpacity>
+              <Switch
+                value={item.status === 'on'}
+                onValueChange={() => handleSwitchToggle(item._id, item.status)}
+                trackColor={{ true: 'green', false: 'red' }}
+                thumbColor={item.status === 'on' ? 'white' : 'black'}
+              />
               <TouchableOpacity style={styles.scheduleButton} onPress={() => { 
                 setSelectedMotor(item); 
                 setScheduleModalVisible(true); 
               }}>
                 <Text style={styles.buttonText}>Schedule</Text>
               </TouchableOpacity>
+              <TouchableOpacity 
+  style={styles.deleteButton} 
+  onPress={() => handleDeleteMotor(item._id)}
+>
+  <Text style={styles.buttonText}>Delete</Text>
+</TouchableOpacity>
+
             </View>
           </View>
         )}
       />
 
-<Modal visible={isAddModalVisible} transparent={true} animationType="slide" onRequestClose={() => setAddModalVisible(false)}>
-  <View style={styles.modalContent}>
-    <Text style={styles.modalTitle}>Add New Motor</Text>
-    
-    {/* Label and Input for Motor Name */}
-    <Text style={styles.label}>Motor Name:</Text>
-    <TextInput
-      style={styles.input}
-      placeholder="Enter Motor Name"
-      value={newMotorName}
-      onChangeText={setNewMotorName}
-    />
-    
-    {/* Label and Input for Motor Ref */}
-    <Text style={styles.label}>Motor Ref:</Text>
-    <TextInput
-      style={styles.input}
-      placeholder="Enter Motor Ref"
-      value={motorRef}
-      onChangeText={setMotorRef}
-    />
-    
-    <TouchableOpacity onPress={handleAddMotor} style={styles.modalButton}>
-      <Text style={styles.modalButtonText}>Add Motor</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalButton}>
-      <Text style={styles.modalButtonText}>Cancel</Text>
-    </TouchableOpacity>
-  </View>
-</Modal>
-
+      <Modal visible={isAddModalVisible} transparent={true} animationType="slide" onRequestClose={() => setAddModalVisible(false)}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Add New Motor</Text>
+          
+          <Text style={styles.label}>Motor Name:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter Motor Name"
+            value={newMotorName}
+            onChangeText={setNewMotorName}
+          />
+          
+          <Text style={styles.label}>Motor Ref:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter Motor Ref"
+            value={motorRef}
+            onChangeText={setMotorRef}
+          />
+          
+          <TouchableOpacity onPress={handleAddMotor} style={styles.modalButton}>
+            <Text style={styles.modalButtonText}>Add Motor</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalButton}>
+            <Text style={styles.modalButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       <Modal visible={isScheduleModalVisible} transparent={true} animationType="slide" onRequestClose={() => setScheduleModalVisible(false)}>
         <View style={styles.modalContent}>
@@ -216,9 +228,9 @@ const PumpControlScreen = () => {
       </Modal>
 
       <View style={styles.footer}>
-      <TouchableOpacity style={styles.footerButton} onPress={() => navigation.navigate('His')}>
-  <Text style={styles.footerButtonText}>Historique</Text>
-</TouchableOpacity>
+        <TouchableOpacity style={styles.footerButton} onPress={() => navigation.navigate('His')}>
+          <Text style={styles.footerButtonText}>Historique</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.footerButton} onPress={handleLogout}>
           <Text style={styles.footerButtonText}>Déconnexion</Text>
@@ -231,7 +243,7 @@ const PumpControlScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  marginTop:40,
+    marginTop: 40,
     padding: 20,
   },
   addButton: {
@@ -263,20 +275,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  onButton: {
-    backgroundColor: 'green',
-    padding: 10,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  offButton: {
-    backgroundColor: 'red',
-    padding: 10,
-    borderRadius: 5,
-    marginRight: 10,
-  },
   scheduleButton: {
     backgroundColor: 'blue',
+    marginLeft:20,
     padding: 10,
     borderRadius: 5,
   },
@@ -318,6 +319,13 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: 'white',
   },
+  deleteButton: {
+    backgroundColor: 'red',
+    marginLeft: 20,
+    padding: 10,
+    borderRadius: 5,
+  },
+  
   label: {
     fontSize: 16,
     marginBottom: 5,

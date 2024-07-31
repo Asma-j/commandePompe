@@ -31,6 +31,18 @@ router.post('/schedule', async (req, res) => {
 });
 
 
+router.delete('/delete/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const motor = await Motor.findByIdAndDelete(id);
+    if (!motor) {
+      return res.status(404).json({ error: 'Motor not found' });
+    }
+    res.status(200).json({ message: 'Motor deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: 'Failed to delete motor' });
+  }
+});
 router.get('/', async (req, res) => {
   try {
     const motors = await Motor.find();
